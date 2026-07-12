@@ -11,6 +11,9 @@ export type TaskType = (typeof TASK_TYPES)[number];
 export const TASK_STATUSES = ['pending', 'in_progress', 'done'] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
+export const TASK_REPEATS = ['none', 'daily', 'weekly', 'monthly'] as const;
+export type TaskRepeat = (typeof TASK_REPEATS)[number];
+
 export interface Task {
   id: string;
   title: string;
@@ -19,7 +22,9 @@ export interface Task {
   status: TaskStatus;
   scheduledDate: string | null;
   scheduledHour: number | null;
+  scheduledMinute: number | null;
   durationMinutes: number;
+  repeat: TaskRepeat;
   parentId: string | null;
   position: number;
   createdAt: string;

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { api } from '../lib/api.ts';
-import type { HeatmapData, TaskType } from '../types.ts';
+import { useMemo, useState } from 'react';
+import type { HeatmapData, Task, TaskType } from '../types.ts';
 import { TASK_TYPES } from '../types.ts';
+import { expandOccurrences } from '../lib/occurrences.ts';
 import { TYPE_COLOR, TYPE_LABEL } from '../lib/theme.ts';
 import { addDays, fmtLong, parseISODate, startOfWeek, toISODate } from '../lib/dates.ts';
 
@@ -13,14 +13,13 @@ const MONTH_ABBR = [
 
 interface Props {
   anchor: string;
+  tasks: Task[];
 }
 
-export function Heatmap({ anchor }: Props) {
-  const [data, setData] = useState<HeatmapData>({});
+export function Heatmap({ anchor, tasks }: Props) {
   const [enabled, setEnabled] = useState<Set<TaskType>>(new Set(TASK_TYPES));
-  const [error, setError] = useState<string | null>(null);
 
-  // Trailing 53 weeks ending at the anchor's week.
+  // Trailing 53 weeks ending at the anchor's (Saturday-first) week.
   const { columns, from, to } = useMemo(() => {
     const endWeek = startOfWeek(anchor);
     const startWeek = addDays(endWeek, -(WEEKS - 1) * 7);
@@ -32,16 +31,18 @@ export function Heatmap({ anchor }: Props) {
     return { columns: cols, from: startWeek, to: addDays(endWeek, 6) };
   }, [anchor]);
 
-  useEffect(() => {
-    let alive = true;
-    api
-      .heatmap(from, to)
-      .then((d) => alive && setData(d))
-      .catch((e) => alive && setError(e instanceof Error ? e.message : 'Failed to load'));
-    return () => {
-      alive = false;
-    };
-  }, [from, to]);
+  // Aggregate top-level occurrences (repeats expanded) per day, grouped by type.
+  const data: HeatmapData = useMemo(() => {
+    const occ = expandOccurrences(tasks, from, to).filter((t) => t.parentId === null);
+    const result: HeatmapData = {};
+    for (const t of occ) {
+      const d = t.scheduledDate!;
+      if (!result[d]) result[d] = { total: 0, byType: {} };
+      result[d].byType[t.type] = (result[d].byType[t.type] ?? 0) + 1;
+      result[d].total += 1;
+    }
+    return result;
+  }, [tasks, from, to]);
 
   // Max filtered count for intensity scaling.
   const filteredCount = (date: string): { total: number; top: TaskType[] } => {
@@ -144,7 +145,6 @@ export function Heatmap({ anchor }: Props) {
       </header>
 
       <div className="flex-1 overflow-auto p-4">
-        {error && <p className="text-sm text-errand">{error}</p>}
         <div className="inline-block min-w-full">
           {/* month labels */}
           <div className="mb-1 flex pl-8">
@@ -157,10 +157,10 @@ export function Heatmap({ anchor }: Props) {
           <div className="flex">
             {/* weekday labels */}
             <div className="mr-1 flex w-7 flex-col justify-between py-[1px] font-mono text-[9px] text-muted">
+              <span>Sat</span>
               <span>Mon</span>
               <span>Wed</span>
               <span>Fri</span>
-              <span />
             </div>
             {/* grid */}
             <div className="flex gap-[3px]">

@@ -2,7 +2,7 @@
 #
 # TaskFlow — one-shot launcher.
 # Ensures a compatible Node, installs deps on first run, then starts the API
-# server (:4000) and the Vite client (:5173) together. Ctrl+C stops both.
+# server (:47821) and the Vite client (:47820) together. Ctrl+C stops both.
 #
 # Usage:
 #   ./run.sh            # install (if needed) + run server & client
@@ -113,18 +113,18 @@ cleanup() {
 run_all() {
   trap cleanup EXIT INT TERM
 
-  say "Starting API server on http://localhost:4000"
+  say "Starting API server on http://localhost:47821"
   ( cd "$SERVER" && npm start ) &
   PIDS+=("$!")
 
-  say "Starting web client on http://localhost:5173"
+  say "Starting web client on http://localhost:47820"
   ( cd "$CLIENT" && npm run dev ) &
   PIDS+=("$!")
 
   printf '\n'
   ok "TaskFlow is up:"
-  printf '   %s→%s  App:  %shttp://localhost:5173%s\n' "$c_dim" "$c_reset" "$c_green" "$c_reset"
-  printf '   %s→%s  API:  %shttp://localhost:4000/api%s\n' "$c_dim" "$c_reset" "$c_green" "$c_reset"
+  printf '   %s→%s  App:  %shttp://localhost:47820%s\n' "$c_dim" "$c_reset" "$c_green" "$c_reset"
+  printf '   %s→%s  API:  %shttp://localhost:47821/api%s\n' "$c_dim" "$c_reset" "$c_green" "$c_reset"
   printf '   %sPress Ctrl+C to stop both.%s\n\n' "$c_dim" "$c_reset"
 
   # Exit (and trigger cleanup) as soon as either service dies.

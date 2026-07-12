@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { TASK_TYPES, type NewTask, type Task, type TaskType } from '../types.ts';
+import {
+  TASK_REPEATS,
+  TASK_TYPES,
+  type NewTask,
+  type Task,
+  type TaskRepeat,
+  type TaskType,
+} from '../types.ts';
 import { TYPE_COLOR, TYPE_LABEL } from '../lib/theme.ts';
 import { useTasks } from '../store.tsx';
 import { fmtHour } from '../lib/dates.ts';
@@ -12,6 +19,13 @@ interface Props {
 }
 
 const DURATIONS = [15, 30, 45, 60, 90, 120, 180, 240];
+const MINUTES = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+const REPEAT_LABEL: Record<TaskRepeat, string> = {
+  none: 'Does not repeat',
+  daily: 'Daily',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+};
 
 export function TaskEditor({ task, defaults, onClose }: Props) {
   const { create, update, remove, byId } = useTasks();
@@ -26,8 +40,14 @@ export function TaskEditor({ task, defaults, onClose }: Props) {
   const [scheduledHour, setScheduledHour] = useState<number | null>(
     task?.scheduledHour ?? defaults?.scheduledHour ?? null,
   );
+  const [scheduledMinute, setScheduledMinute] = useState<number>(
+    task?.scheduledMinute ?? defaults?.scheduledMinute ?? 0,
+  );
   const [durationMinutes, setDurationMinutes] = useState<number>(
     task?.durationMinutes ?? defaults?.durationMinutes ?? 60,
+  );
+  const [repeat, setRepeat] = useState<TaskRepeat>(
+    task?.repeat ?? defaults?.repeat ?? 'none',
   );
 
   const parent = task?.parentId ? byId.get(task.parentId) : undefined;
@@ -42,13 +62,17 @@ export function TaskEditor({ task, defaults, onClose }: Props) {
 
   const submit = async () => {
     if (!title.trim()) return;
+    const scheduled = !!scheduledDate;
+    const hasHour = scheduled && scheduledHour !== null;
     const payload: Partial<Task> = {
       title: title.trim(),
       notes: notes.trim() ? notes.trim() : null,
       type,
       scheduledDate: scheduledDate || null,
-      scheduledHour: scheduledDate ? scheduledHour : null,
+      scheduledHour: scheduled ? scheduledHour : null,
+      scheduledMinute: hasHour ? scheduledMinute : null,
       durationMinutes,
+      repeat,
     };
     if (isEdit) {
       await update(task!.id, payload);
@@ -140,6 +164,27 @@ export function TaskEditor({ task, defaults, onClose }: Props) {
               <p className="mt-1 text-[11px] text-muted">Empty = backlog</p>
             </div>
             <div>
+              <label className="label" htmlFor="te-repeat">
+                Repeat
+              </label>
+              <select
+                id="te-repeat"
+                className="input disabled:opacity-40"
+                disabled={!scheduledDate}
+                value={repeat}
+                onChange={(e) => setRepeat(e.target.value as TaskRepeat)}
+              >
+                {TASK_REPEATS.map((r) => (
+                  <option key={r} value={r}>
+                    {REPEAT_LABEL[r]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
               <label className="label" htmlFor="te-hour">
                 Hour
               </label>
@@ -160,24 +205,41 @@ export function TaskEditor({ task, defaults, onClose }: Props) {
                 ))}
               </select>
             </div>
-          </div>
-
-          <div>
-            <label className="label" htmlFor="te-dur">
-              Duration
-            </label>
-            <select
-              id="te-dur"
-              className="input"
-              value={durationMinutes}
-              onChange={(e) => setDurationMinutes(Number(e.target.value))}
-            >
-              {DURATIONS.map((d) => (
-                <option key={d} value={d}>
-                  {d < 60 ? `${d} min` : `${d / 60} hr${d >= 120 ? 's' : ''}`}
-                </option>
-              ))}
-            </select>
+            <div>
+              <label className="label" htmlFor="te-min">
+                Minute
+              </label>
+              <select
+                id="te-min"
+                className="input disabled:opacity-40"
+                disabled={!scheduledDate || scheduledHour === null}
+                value={scheduledMinute}
+                onChange={(e) => setScheduledMinute(Number(e.target.value))}
+              >
+                {MINUTES.map((m) => (
+                  <option key={m} value={m}>
+                    :{String(m).padStart(2, '0')}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="te-dur">
+                Duration
+              </label>
+              <select
+                id="te-dur"
+                className="input"
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(Number(e.target.value))}
+              >
+                {DURATIONS.map((d) => (
+                  <option key={d} value={d}>
+                    {d < 60 ? `${d} min` : `${d / 60} hr${d >= 120 ? 's' : ''}`}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>

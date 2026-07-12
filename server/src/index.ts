@@ -4,7 +4,8 @@ import './db.ts'; // initialize schema + seed on boot
 import { tasksRouter } from './routes/tasks.ts';
 
 const app = express();
-const PORT = Number(process.env.PORT ?? 4000);
+// Uncommon high port to avoid clashing with other local dev servers.
+const PORT = Number(process.env.PORT ?? 47821);
 
 app.use(cors());
 app.use(express.json());

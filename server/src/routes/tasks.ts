@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { db, rowToTask } from '../db.ts';
-import { isTaskStatus, isTaskType, type Task } from '../types.ts';
+import { isTaskRepeat, isTaskStatus, isTaskType, type Task } from '../types.ts';
 
 export const tasksRouter = Router();
 
@@ -99,6 +99,10 @@ tasksRouter.post('/', (req: Request, res: Response) => {
   if (!isTaskStatus(status)) {
     return res.status(400).json({ error: `invalid status: ${b.status}` });
   }
+  const repeat = b.repeat ?? 'none';
+  if (!isTaskRepeat(repeat)) {
+    return res.status(400).json({ error: `invalid repeat: ${b.repeat}` });
+  }
   if (b.parentId != null && !getTaskById(b.parentId)) {
     return res.status(400).json({ error: 'parentId does not exist' });
   }
@@ -119,8 +123,8 @@ tasksRouter.post('/', (req: Request, res: Response) => {
 
   db.prepare(
     `INSERT INTO tasks
-       (id, title, notes, type, status, scheduledDate, scheduledHour, durationMinutes, parentId, position, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, title, notes, type, status, scheduledDate, scheduledHour, scheduledMinute, durationMinutes, repeat, parentId, position, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     b.title.trim(),
@@ -129,7 +133,9 @@ tasksRouter.post('/', (req: Request, res: Response) => {
     status,
     b.scheduledDate ?? null,
     b.scheduledHour ?? null,
+    typeof b.scheduledMinute === 'number' ? b.scheduledMinute : null,
     typeof b.durationMinutes === 'number' ? b.durationMinutes : 60,
+    repeat,
     b.parentId ?? null,
     position,
     now,
@@ -147,7 +153,9 @@ const UPDATABLE: Record<string, (v: unknown) => boolean> = {
   status: (v) => isTaskStatus(v),
   scheduledDate: (v) => v === null || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)),
   scheduledHour: (v) => v === null || (typeof v === 'number' && v >= 0 && v <= 23),
+  scheduledMinute: (v) => v === null || (typeof v === 'number' && v >= 0 && v <= 59),
   durationMinutes: (v) => typeof v === 'number' && v > 0,
+  repeat: (v) => isTaskRepeat(v),
   parentId: (v) => v === null || typeof v === 'string',
   position: (v) => typeof v === 'number',
 };
@@ -166,10 +174,10 @@ tasksRouter.patch('/:id', (req: Request, res: Response) => {
     if (!validate(value)) {
       return res.status(400).json({ error: `invalid value for ${key}` });
     }
-    // Clearing the date also clears the hour (backlog items aren't on the grid).
+    // Clearing the date also clears the hour/minute (backlog items aren't on the grid).
     if (key === 'scheduledDate' && value === null) {
-      sets.push('scheduledHour = ?');
-      values.push(null);
+      sets.push('scheduledHour = ?', 'scheduledMinute = ?');
+      values.push(null, null);
     }
     if (key === 'title' && typeof value === 'string') value = value.trim();
     sets.push(`${key} = ?`);

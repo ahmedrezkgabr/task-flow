@@ -1,6 +1,6 @@
 import { useDroppable } from '@dnd-kit/core';
 import { HOUR_PX, HOURS, layoutDay, slotId } from '../lib/grid.ts';
-import type { Task } from '../types.ts';
+import type { Occurrence } from '../lib/occurrences.ts';
 import { fmtHour, fmtWeekday, fmtDayNum, today } from '../lib/dates.ts';
 import { TaskBlock } from './TaskBlock.tsx';
 
@@ -36,7 +36,7 @@ function NowLine({ date }: { date: string }) {
 
 interface ColumnProps {
   date: string;
-  tasks: Task[];
+  tasks: Occurrence[];
   onOpen: (id: string) => void;
   compact?: boolean;
 }
@@ -66,7 +66,7 @@ function DayColumn({ date, tasks, onOpen, compact }: ColumnProps) {
 
 interface Props {
   dates: string[];
-  tasksByDate: Map<string, Task[]>;
+  tasksByDate: Map<string, Occurrence[]>;
   onOpen: (id: string) => void;
 }
 

@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import type { Task } from '../types.ts';
+import type { Occurrence } from '../lib/occurrences.ts';
 import { TYPE_COLOR } from '../lib/theme.ts';
 import { StatusCheckbox, nextStatus } from './StatusCheckbox.tsx';
+import { RepeatBadge } from './RepeatBadge.tsx';
 import { useTasks } from '../store.tsx';
-import { fmtHour } from '../lib/dates.ts';
+import { fmtHM } from '../lib/dates.ts';
 
 interface Props {
   scopeLabel: string;
-  // Top-level tasks in the current scope (already filtered by the parent view).
-  tasks: Task[];
+  // Top-level occurrences in the current scope (already filtered by the parent view).
+  tasks: Occurrence[];
   onOpen: (id: string) => void;
   onNewSubtask: (parentId: string) => void;
 }
@@ -25,7 +27,9 @@ function Row({
   onNewSubtask: (parentId: string) => void;
 }) {
   const { update, childrenOf } = useTasks();
-  const kids = depth === 0 ? childrenOf(task.id) : [];
+  // Occurrences carry the real row id in baseId; subtasks use their own id.
+  const rowId = (task as Occurrence).baseId ?? task.id;
+  const kids = depth === 0 ? childrenOf(rowId) : [];
   const [open, setOpen] = useState(true);
 
   return (
@@ -60,7 +64,7 @@ function Row({
         <StatusCheckbox
           size="sm"
           status={task.status}
-          onToggle={() => update(task.id, { status: nextStatus(task.status) })}
+          onToggle={() => update(rowId, { status: nextStatus(task.status) })}
         />
 
         <span
@@ -69,7 +73,7 @@ function Row({
         />
 
         <button
-          onClick={() => onOpen(task.id)}
+          onClick={() => onOpen(rowId)}
           className={`min-w-0 flex-1 truncate text-left text-sm ${
             task.status === 'done' ? 'text-muted line-through' : 'text-ink'
           }`}
@@ -77,15 +81,17 @@ function Row({
           {task.title}
         </button>
 
+        {task.repeat !== 'none' && <RepeatBadge repeat={task.repeat} />}
+
         {task.scheduledHour !== null && (
           <span className="shrink-0 font-mono text-[10px] text-muted">
-            {fmtHour(task.scheduledHour)}
+            {fmtHM(task.scheduledHour, task.scheduledMinute)}
           </span>
         )}
 
         {depth === 0 && (
           <button
-            onClick={() => onNewSubtask(task.id)}
+            onClick={() => onNewSubtask(rowId)}
             className="shrink-0 text-muted opacity-0 transition-opacity hover:text-ink group-hover:opacity-100"
             title="Add subtask"
             aria-label="Add subtask"

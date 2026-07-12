@@ -23,6 +23,7 @@ import {
   weekDays,
 } from './lib/dates.ts';
 import { TYPE_COLOR } from './lib/theme.ts';
+import { expandOccurrences, type Occurrence } from './lib/occurrences.ts';
 import { PlannerGrid } from './components/PlannerGrid.tsx';
 import { MonthView } from './components/MonthView.tsx';
 import { Heatmap } from './components/Heatmap.tsx';
@@ -88,10 +89,8 @@ export function App() {
       last.setMonth(last.getMonth() + 1, 0);
       to = toISODate(last);
     }
-    const inScope = tasks.filter(
-      (t) => t.scheduledDate !== null && t.scheduledDate >= from && t.scheduledDate <= to,
-    );
-    const map = new Map<string, Task[]>();
+    const inScope = expandOccurrences(tasks, from, to);
+    const map = new Map<string, Occurrence[]>();
     for (const t of inScope) {
       if (!map.has(t.scheduledDate!)) map.set(t.scheduledDate!, []);
       map.get(t.scheduledDate!)!.push(t);
@@ -99,7 +98,8 @@ export function App() {
     return { scopeTasks: inScope, tasksByDate: map };
   }, [tasks, view, anchor]);
 
-  const activeTask = activeId ? byId.get(activeId) : undefined;
+  // Occurrence draggable ids look like "<baseId>@<date>"; resolve to the base.
+  const activeTask = activeId ? byId.get(activeId.split('@')[0]) : undefined;
 
   const onDragStart = (e: DragStartEvent) => setActiveId(String(e.active.id));
 
@@ -107,19 +107,22 @@ export function App() {
     setActiveId(null);
     const { active, over } = e;
     if (!over) return;
-    const task = active.data.current?.task as Task | undefined;
+    const task = active.data.current?.task as (Task & { baseId?: string }) | undefined;
     if (!task) return;
+    // Occurrences carry the real row id in baseId; plain tasks fall back to id.
+    const targetId = task.baseId ?? task.id;
 
     if (over.id === 'backlog') {
       if (task.scheduledDate !== null) {
-        update(task.id, { scheduledDate: null, scheduledHour: null });
+        update(targetId, { scheduledDate: null, scheduledHour: null, scheduledMinute: null });
       }
       return;
     }
     const slot = parseSlotId(String(over.id));
     if (slot) {
-      if (task.scheduledDate !== slot.date || task.scheduledHour !== slot.hour) {
-        update(task.id, { scheduledDate: slot.date, scheduledHour: slot.hour });
+      // Dropping on a slot snaps to the top of the hour.
+      if (task.scheduledDate !== slot.date || task.scheduledHour !== slot.hour || task.scheduledMinute) {
+        update(targetId, { scheduledDate: slot.date, scheduledHour: slot.hour, scheduledMinute: 0 });
       }
     }
   };
@@ -221,7 +224,7 @@ export function App() {
             {loading ? (
               <div className="grid h-full place-items-center text-sm text-muted">Loading…</div>
             ) : view === 'heatmap' ? (
-              <Heatmap anchor={anchor} />
+              <Heatmap anchor={anchor} tasks={tasks} />
             ) : view === 'month' ? (
               <MonthView anchor={anchor} tasks={tasks} onOpen={(id) => setEditor({ task: byId.get(id) })} />
             ) : (

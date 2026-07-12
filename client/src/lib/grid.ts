@@ -1,4 +1,5 @@
 import type { Task } from '../types.ts';
+import type { Occurrence } from './occurrences.ts';
 
 export const HOUR_PX = 52; // pixel height of one hour row on the planner
 export const HOURS: number[] = Array.from({ length: 24 }, (_, i) => i);
@@ -13,7 +14,7 @@ export function parseSlotId(id: string): { date: string; hour: number } | null {
 }
 
 export interface PlacedTask {
-  task: Task;
+  task: Occurrence;
   top: number;
   height: number;
   lane: number; // 0-based lane index
@@ -24,7 +25,7 @@ export interface PlacedTask {
  * Greedy interval partitioning: lay out a day's scheduled tasks into side-by-side
  * lanes so overlapping blocks don't cover each other.
  */
-export function layoutDay(tasks: Task[]): PlacedTask[] {
+export function layoutDay(tasks: Occurrence[]): PlacedTask[] {
   const scheduled = tasks
     .filter((t) => t.scheduledHour !== null)
     .sort((a, b) => (a.scheduledHour! - b.scheduledHour!) || a.position - b.position);
@@ -34,8 +35,9 @@ export function layoutDay(tasks: Task[]): PlacedTask[] {
   let cluster: PlacedTask[] = [];
   let clusterEnd = -1;
 
-  const start = (t: Task) => t.scheduledHour! * 60;
-  const end = (t: Task) => t.scheduledHour! * 60 + t.durationMinutes;
+  // Minute-of-day start/end, so a 09:30 task sits half a row down.
+  const start = (t: Task) => t.scheduledHour! * 60 + (t.scheduledMinute ?? 0);
+  const end = (t: Task) => start(t) + t.durationMinutes;
 
   const flush = () => {
     const lanes = Math.max(1, ...cluster.map((p) => p.lane + 1));
@@ -60,7 +62,7 @@ export function layoutDay(tasks: Task[]): PlacedTask[] {
     }
     const p: PlacedTask = {
       task: t,
-      top: (t.scheduledHour! * 60 * HOUR_PX) / 60,
+      top: (start(t) * HOUR_PX) / 60,
       height: Math.max(22, (t.durationMinutes * HOUR_PX) / 60),
       lane,
       lanes: 1,

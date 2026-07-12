@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
-import type { Task, TaskType } from './types.ts';
+import type { Task, TaskRepeat, TaskType } from './types.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, '..', 'data');
@@ -24,7 +24,9 @@ db.exec(`
     status          TEXT NOT NULL DEFAULT 'pending',
     scheduledDate   TEXT,
     scheduledHour   INTEGER,
+    scheduledMinute INTEGER,
     durationMinutes INTEGER NOT NULL DEFAULT 60,
+    repeat          TEXT NOT NULL DEFAULT 'none',
     parentId        TEXT REFERENCES tasks(id) ON DELETE CASCADE,
     position        INTEGER NOT NULL DEFAULT 0,
     createdAt       TEXT NOT NULL,
@@ -34,6 +36,20 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tasks_scheduledDate ON tasks(scheduledDate);
   CREATE INDEX IF NOT EXISTS idx_tasks_parentId ON tasks(parentId);
 `);
+
+// Lightweight migration: add columns introduced after the first release so an
+// existing taskflow.db keeps its data instead of needing a reset.
+{
+  const cols = new Set(
+    (db.prepare('PRAGMA table_info(tasks)').all() as { name: string }[]).map((c) => c.name),
+  );
+  if (!cols.has('scheduledMinute')) {
+    db.exec('ALTER TABLE tasks ADD COLUMN scheduledMinute INTEGER');
+  }
+  if (!cols.has('repeat')) {
+    db.exec("ALTER TABLE tasks ADD COLUMN repeat TEXT NOT NULL DEFAULT 'none'");
+  }
+}
 
 /**
  * Rows come back from node:sqlite with SQLite's loose typing. Normalize into a
@@ -51,7 +67,12 @@ export function rowToTask(row: Record<string, unknown>): Task {
       row.scheduledHour === null || row.scheduledHour === undefined
         ? null
         : Number(row.scheduledHour),
+    scheduledMinute:
+      row.scheduledMinute === null || row.scheduledMinute === undefined
+        ? null
+        : Number(row.scheduledMinute),
     durationMinutes: Number(row.durationMinutes),
+    repeat: (row.repeat as TaskRepeat) ?? 'none',
     parentId: (row.parentId as string | null) ?? null,
     position: Number(row.position),
     createdAt: row.createdAt as string,
@@ -77,8 +98,8 @@ function seedIfEmpty() {
 
   const insert = db.prepare(`
     INSERT INTO tasks
-      (id, title, notes, type, status, scheduledDate, scheduledHour, durationMinutes, parentId, position, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, title, notes, type, status, scheduledDate, scheduledHour, scheduledMinute, durationMinutes, repeat, parentId, position, createdAt, updatedAt)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   type Seed = Partial<Task> & { title: string; type: TaskType };
@@ -92,7 +113,9 @@ function seedIfEmpty() {
       s.status ?? 'pending',
       s.scheduledDate ?? null,
       s.scheduledHour ?? null,
+      s.scheduledMinute ?? null,
       s.durationMinutes ?? 60,
+      s.repeat ?? 'none',
       s.parentId ?? null,
       position,
       iso(),
@@ -111,8 +134,9 @@ function seedIfEmpty() {
       notes: 'Daily sync — blockers & priorities',
       scheduledDate: dayOffset(0),
       scheduledHour: 9,
+      scheduledMinute: 15,
       durationMinutes: 30,
-      status: 'done',
+      repeat: 'daily',
     },
     pos++,
   );
@@ -123,6 +147,7 @@ function seedIfEmpty() {
       type: 'work',
       scheduledDate: dayOffset(0),
       scheduledHour: 11,
+      scheduledMinute: 30,
       durationMinutes: 90,
       status: 'in_progress',
     },
@@ -152,7 +177,9 @@ function seedIfEmpty() {
       type: 'health',
       scheduledDate: dayOffset(0),
       scheduledHour: 18,
+      scheduledMinute: 0,
       durationMinutes: 60,
+      repeat: 'weekly',
     },
     pos++,
   );

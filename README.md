@@ -27,7 +27,7 @@ The root [`run.sh`](run.sh) launcher installs dependencies (first run only) and 
 API and the web client together, with clean shutdown on `Ctrl+C`:
 
 ```bash
-./run.sh            # install if needed, then run server (:4000) + client (:5173)
+./run.sh            # install if needed, then run server (:47821) + client (:47820)
 ./run.sh install    # install dependencies only, then exit
 ./run.sh doctor     # report Node/npm versions and check compatibility
 ./run.sh --help     # usage
@@ -35,13 +35,13 @@ API and the web client together, with clean shutdown on `Ctrl+C`:
 
 If your default Node is older than 22.5, the script automatically switches to a compatible version
 via [nvm](https://github.com/nvm-sh/nvm) when one is installed. Then open
-**<http://localhost:5173>**.
+**<http://localhost:47820>**.
 
 ## Running it manually
 
 Prefer to run each side yourself? Open **two terminals**.
 
-**1 · API server** (port 4000):
+**1 · API server** (port 47821):
 
 ```bash
 cd server
@@ -52,7 +52,7 @@ npm run dev
 On first boot it creates `server/data/taskflow.db` and seeds a handful of example tasks
 (mixed types, some with subtasks, some scheduled around today).
 
-**2 · Web client** (port 5173):
+**2 · Web client** (port 47820):
 
 ```bash
 cd client
@@ -60,29 +60,36 @@ npm install
 npm run dev
 ```
 
-Then open **<http://localhost:5173>**. The Vite dev server proxies `/api/*` to the server on 4000.
+Then open **<http://localhost:47820>**. The Vite dev server proxies `/api/*` to the server on 47821.
 
 > To start over from an empty database, stop the server and delete `server/data/taskflow.db`
 > (and any `-wal`/`-shm` files); it will re-seed on next boot.
 
 ## Features / views
 
-- **Day planner** — 24-hour ruled grid; drag task blocks onto hour slots. Block height reflects
-  `durationMinutes`, the left accent bar and tint reflect `type`. A red rule marks the current time.
-- **Week planner** — the same grid across 7 day-columns.
-- **Month view** — calendar grid with a compact task list per day; click a day for the full list.
+- **Day planner** — 24-hour ruled grid; drag task blocks onto hour slots. Start time is
+  minute-precise (e.g. 09:15), block height reflects `durationMinutes`, and the left accent bar and
+  tint reflect `type`. A red rule marks the current time.
+- **Week planner** — the same grid across 7 day-columns. **The week starts on Saturday** (Egypt
+  convention: Sat → Fri).
+- **Month view** — calendar grid (Saturday-first) with a compact task list per day; click a day for
+  the full list.
 - **Task list panel** — tasks in the current Day/Week/Month scope with **one level of collapsible
   subtasks** and a checkbox to cycle `pending → in_progress → done`.
 - **Backlog** — unscheduled tasks (`scheduledDate = null`); drag onto the planner to schedule, or
   drag a scheduled task back onto the backlog to unschedule it.
-- **Heatmap** — GitHub-contribution-style calendar. Cell intensity = task count that day; cell
-  color = dominant `type` (split fill when multiple). Toggle types to filter.
+- **Repeating tasks** — a task can repeat **daily**, **weekly** (same weekday), or **monthly** (same
+  day-of-month). Recurring occurrences are expanded across every view from the start date onward and
+  carry a small `↻` badge; editing or toggling any occurrence updates the underlying task.
+- **Heatmap** — GitHub-contribution-style calendar (Saturday-first rows). Cell intensity = task
+  count that day; cell color = dominant `type` (split fill when multiple). Toggle types to filter.
 
 ## Data model (`tasks`)
 
 `id` · `title` · `notes?` · `type` (`work|personal|health|learning|errand|other`) ·
 `status` (`pending|in_progress|done`) · `scheduledDate?` (`YYYY-MM-DD`) · `scheduledHour?` (0–23) ·
-`durationMinutes` · `parentId?` (one level of subtasks) · `position` · `createdAt` · `updatedAt`.
+`scheduledMinute?` (0–59) · `durationMinutes` · `repeat` (`none|daily|weekly|monthly`) ·
+`parentId?` (one level of subtasks) · `position` · `createdAt` · `updatedAt`.
 
 ## API
 
@@ -94,7 +101,7 @@ Base URL `/api`.
 | `GET`  | `/tasks?unscheduled=1` | backlog tasks with no date |
 | `GET`  | `/tasks` | all tasks |
 | `GET`  | `/tasks/:id` | one task |
-| `POST` | `/tasks` | create (validates `type`/`status` enums) |
+| `POST` | `/tasks` | create (validates `type`/`status`/`repeat` enums) |
 | `PATCH`| `/tasks/:id` | partial update (drag reschedule, status toggle, edits) |
 | `DELETE`| `/tasks/:id` | deletes the task; subtasks cascade |
 | `GET`  | `/tasks/meta/heatmap?from=&to=` | per-day counts grouped by `type` (top-level tasks only) |

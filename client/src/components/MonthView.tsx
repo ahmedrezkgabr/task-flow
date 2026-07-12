@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react';
 import type { Task } from '../types.ts';
+import { expandOccurrences, type Occurrence } from '../lib/occurrences.ts';
 import { TYPE_COLOR } from '../lib/theme.ts';
 import {
   fmtDayNum,
+  fmtHM,
   fmtLong,
   isSameMonth,
   monthGridDays,
   today,
 } from '../lib/dates.ts';
 import { StatusCheckbox, nextStatus } from './StatusCheckbox.tsx';
+import { RepeatBadge } from './RepeatBadge.tsx';
 import { useTasks } from '../store.tsx';
 
 interface Props {
@@ -17,26 +20,33 @@ interface Props {
   onOpen: (id: string) => void;
 }
 
-const WEEK_HEADS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+// Saturday-first week (Egypt convention).
+const WEEK_HEADS = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 
 export function MonthView({ anchor, tasks, onOpen }: Props) {
   const { update } = useTasks();
   const days = useMemo(() => monthGridDays(anchor), [anchor]);
   const [selected, setSelected] = useState<string | null>(null);
 
-  // Top-level scheduled tasks grouped by date.
+  // Top-level occurrences (repeats expanded) grouped by date across the grid.
   const byDate = useMemo(() => {
-    const m = new Map<string, Task[]>();
-    for (const t of tasks) {
-      if (t.scheduledDate && t.parentId === null) {
-        (m.get(t.scheduledDate) ?? m.set(t.scheduledDate, []).get(t.scheduledDate)!).push(t);
-      }
+    const m = new Map<string, Occurrence[]>();
+    if (days.length === 0) return m;
+    const occ = expandOccurrences(tasks, days[0], days[days.length - 1]).filter(
+      (t) => t.parentId === null,
+    );
+    for (const t of occ) {
+      (m.get(t.scheduledDate!) ?? m.set(t.scheduledDate!, []).get(t.scheduledDate!)!).push(t);
     }
     for (const list of m.values()) {
-      list.sort((a, b) => (a.scheduledHour ?? 99) - (b.scheduledHour ?? 99));
+      list.sort(
+        (a, b) =>
+          (a.scheduledHour ?? 99) - (b.scheduledHour ?? 99) ||
+          (a.scheduledMinute ?? 0) - (b.scheduledMinute ?? 0),
+      );
     }
     return m;
-  }, [tasks]);
+  }, [tasks, days]);
 
   const selectedTasks = selected ? byDate.get(selected) ?? [] : [];
 
@@ -124,10 +134,10 @@ export function MonthView({ anchor, tasks, onOpen }: Props) {
           {selectedTasks.map((t) => (
             <div
               key={t.id}
-              onClick={() => onOpen(t.id)}
+              onClick={() => onOpen(t.baseId)}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && onOpen(t.id)}
+              onKeyDown={(e) => e.key === 'Enter' && onOpen(t.baseId)}
               style={{ borderLeft: `3px solid ${TYPE_COLOR[t.type]}` }}
               className="flex cursor-pointer items-start gap-2 rounded-[3px] border border-line bg-surface-2 px-2 py-1.5 hover:border-line-strong"
             >
@@ -135,16 +145,17 @@ export function MonthView({ anchor, tasks, onOpen }: Props) {
                 <StatusCheckbox
                   size="sm"
                   status={t.status}
-                  onToggle={() => update(t.id, { status: nextStatus(t.status) })}
+                  onToggle={() => update(t.baseId, { status: nextStatus(t.status) })}
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <p className={`truncate text-sm text-ink ${t.status === 'done' ? 'line-through text-muted' : ''}`}>
-                  {t.title}
+                <p className={`flex items-center gap-1 truncate text-sm text-ink ${t.status === 'done' ? 'line-through text-muted' : ''}`}>
+                  <span className="truncate">{t.title}</span>
+                  {t.repeat !== 'none' && <RepeatBadge repeat={t.repeat} />}
                 </p>
                 {t.scheduledHour !== null && (
                   <p className="font-mono text-[10px] text-muted">
-                    {String(t.scheduledHour).padStart(2, '0')}:00
+                    {fmtHM(t.scheduledHour, t.scheduledMinute)}
                   </p>
                 )}
               </div>

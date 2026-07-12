@@ -21,10 +21,13 @@ export function addDays(iso: string, n: number): string {
   return toISODate(d);
 }
 
-/** Monday as start of week. Returns the Monday ISO date for the week of `iso`. */
+/**
+ * Saturday as start of week (Egypt convention). Returns the Saturday ISO date
+ * for the week containing `iso`.
+ */
 export function startOfWeek(iso: string): string {
   const d = parseISODate(iso);
-  const dow = (d.getDay() + 6) % 7; // 0 = Monday
+  const dow = (d.getDay() + 1) % 7; // 0 = Saturday
   d.setDate(d.getDate() - dow);
   return toISODate(d);
 }
@@ -57,7 +60,8 @@ export function monthGridDays(iso: string): string[] {
   for (let i = 0; i < 42; i++) {
     days.push(cur);
     cur = addDays(cur, 1);
-    if (cur > last && parseISODate(cur).getDay() === 1) break;
+    // Stop once we're past the month and back at a week boundary (Saturday).
+    if (cur > last && parseISODate(cur).getDay() === 6) break;
   }
   return days;
 }
@@ -88,6 +92,17 @@ export function fmtLong(iso: string): string {
 
 export function fmtHour(h: number): string {
   return `${String(h).padStart(2, '0')}:00`;
+}
+
+/** HH:MM label from an hour and optional minute (null → :00). */
+export function fmtHM(h: number, m: number | null): string {
+  return `${String(h).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`;
+}
+
+/** Add minutes to an hour:minute and return { hour, minute } clamped to the day. */
+export function addMinutes(h: number, m: number | null, add: number): { hour: number; minute: number } {
+  const total = Math.min(24 * 60, h * 60 + (m ?? 0) + add);
+  return { hour: Math.floor(total / 60), minute: total % 60 };
 }
 
 export function isSameMonth(iso: string, refIso: string): boolean {
