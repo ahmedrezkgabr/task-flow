@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+.vite/
+
+# Local runtime data (SQLite database)
+server/data/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# Assistant / prompt artifacts — not part of the project
+.claude/
+CLAUDE.md
+taskflow-build-prompt.md
+
+# Editor / OS cruft
+*.local
+.DS_Store
+.idea/
+.vscode/
+*.log
