@@ -83,6 +83,24 @@ Then open **<http://localhost:47820>**. The Vite dev server proxies `/api/*` to 
   carry a small `↻` badge; editing or toggling any occurrence updates the underlying task.
 - **Heatmap** — GitHub-contribution-style calendar (Saturday-first rows). Cell intensity = task
   count that day; cell color = dominant `type` (split fill when multiple). Toggle types to filter.
+- **Prayer times** — the Day and Week planners draw the five daily prayers (Fajr, Dhuhr, Asr,
+  Maghrib, Isha) as thin teal lines on each day, behind the task blocks. Toggle them with the
+  **☾ Prayers** button. See below for how the data is sourced and cached.
+
+## Prayer times
+
+- **Source**: the free, key-less [Aladhan API](https://aladhan.com/prayer-times-api) — one
+  `/v1/calendar/{year}/{month}` request per visible month.
+- **Location & method**: defaults to **Cairo, Egypt** with calculation **method 5** (Egyptian
+  General Authority of Survey). On first load the app asks the browser for geolocation once and
+  caches the result; if you deny it, the Cairo default is used. Change the defaults in
+  [`client/src/lib/prayer.ts`](client/src/lib/prayer.ts) (`DEFAULT_LOCATION`, `PRAYER_METHOD`).
+- **Offline cache**: each fetched month is stored in `localStorage` and read **cache-first**. Prayer
+  times for a date are deterministic, so once a month has been seen it renders with no network —
+  the feature works fully offline afterward.
+- **Timezone caveat**: Aladhan returns times in the *location's* timezone, while the grid renders in
+  the *device's* local time. These match for an Egypt user on Egypt time; a device set to a
+  different timezone than the prayer location would show the lines offset by that difference.
 
 ## Data model (`tasks`)
 

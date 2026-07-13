@@ -1,8 +1,34 @@
 import { useDroppable } from '@dnd-kit/core';
 import { HOUR_PX, HOURS, layoutDay, slotId } from '../lib/grid.ts';
 import type { Occurrence } from '../lib/occurrences.ts';
+import type { Prayer } from '../lib/prayer.ts';
 import { fmtHour, fmtWeekday, fmtDayNum, today } from '../lib/dates.ts';
 import { TaskBlock } from './TaskBlock.tsx';
+
+// Prayer lines use a calm teal that isn't any task-type accent color.
+const PRAYER_COLOR = '#33B3A6';
+
+/** Five thin dashed lines marking the day's prayer times, behind task blocks. */
+function PrayerLines({ prayers, compact }: { prayers: Prayer[]; compact?: boolean }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[6]">
+      {prayers.map((p) => (
+        <div
+          key={p.name}
+          className="absolute inset-x-0 border-t border-dashed"
+          style={{ top: (p.minutes * HOUR_PX) / 60, borderColor: PRAYER_COLOR }}
+        >
+          <span
+            className="absolute -top-[6px] left-0 rounded-sm bg-base/85 px-1 font-mono text-[9px] leading-none"
+            style={{ color: PRAYER_COLOR }}
+          >
+            {compact ? p.short : `${p.name} · ${p.time}`}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function HourSlot({ date, hour }: { date: string; hour: number }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -37,11 +63,12 @@ function NowLine({ date }: { date: string }) {
 interface ColumnProps {
   date: string;
   tasks: Occurrence[];
+  prayers: Prayer[];
   onOpen: (id: string) => void;
   compact?: boolean;
 }
 
-function DayColumn({ date, tasks, onOpen, compact }: ColumnProps) {
+function DayColumn({ date, tasks, prayers, onOpen, compact }: ColumnProps) {
   const placed = layoutDay(tasks);
   return (
     <div className="relative flex-1" style={{ minWidth: compact ? 96 : 0 }}>
@@ -51,6 +78,8 @@ function DayColumn({ date, tasks, onOpen, compact }: ColumnProps) {
           <HourSlot key={h} date={date} hour={h} />
         ))}
       </div>
+      {/* prayer-time lines (behind task blocks) */}
+      {prayers.length > 0 && <PrayerLines prayers={prayers} compact={compact} />}
       {/* task blocks (foreground layer) */}
       <div className="pointer-events-none absolute inset-0">
         <div className="pointer-events-auto relative h-full">
@@ -67,10 +96,12 @@ function DayColumn({ date, tasks, onOpen, compact }: ColumnProps) {
 interface Props {
   dates: string[];
   tasksByDate: Map<string, Occurrence[]>;
+  prayerByDate: Map<string, Prayer[]>;
+  showPrayers: boolean;
   onOpen: (id: string) => void;
 }
 
-export function PlannerGrid({ dates, tasksByDate, onOpen }: Props) {
+export function PlannerGrid({ dates, tasksByDate, prayerByDate, showPrayers, onOpen }: Props) {
   const compact = dates.length > 1;
   return (
     <div className="panel flex h-full flex-col overflow-hidden rounded-card">
@@ -127,6 +158,7 @@ export function PlannerGrid({ dates, tasksByDate, onOpen }: Props) {
                 <DayColumn
                   date={d}
                   tasks={tasksByDate.get(d) ?? []}
+                  prayers={showPrayers ? prayerByDate.get(d) ?? [] : []}
                   onOpen={onOpen}
                   compact={compact}
                 />

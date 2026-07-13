@@ -24,6 +24,7 @@ import {
 } from './lib/dates.ts';
 import { TYPE_COLOR } from './lib/theme.ts';
 import { expandOccurrences, type Occurrence } from './lib/occurrences.ts';
+import { usePrayerTimes } from './hooks/usePrayerTimes.ts';
 import { PlannerGrid } from './components/PlannerGrid.tsx';
 import { MonthView } from './components/MonthView.tsx';
 import { Heatmap } from './components/Heatmap.tsx';
@@ -57,6 +58,9 @@ export function App() {
   const [anchor, setAnchor] = useState<string>(today());
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [showPrayers, setShowPrayers] = useState<boolean>(
+    () => localStorage.getItem('taskflow.prayer.show') !== '0',
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -69,6 +73,17 @@ export function App() {
     if (view === 'week') return weekDays(anchor);
     return [];
   }, [view, anchor]);
+
+  // Prayer-time lines for the visible days (cached + offline-first).
+  const { byDate: prayerByDate } = usePrayerTimes(dates);
+
+  const togglePrayers = () => {
+    setShowPrayers((v) => {
+      const next = !v;
+      localStorage.setItem('taskflow.prayer.show', next ? '1' : '0');
+      return next;
+    });
+  };
 
   // Tasks scheduled within the current scope, grouped by date.
   const { scopeTasks, tasksByDate } = useMemo(() => {
@@ -202,7 +217,17 @@ export function App() {
 
           <div className="font-mono text-sm text-muted">{headerLabel()}</div>
 
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {(view === 'day' || view === 'week') && (
+              <button
+                onClick={togglePrayers}
+                aria-pressed={showPrayers}
+                title="Toggle prayer-time lines"
+                className={`btn ${showPrayers ? 'btn-active border-[#33B3A6]/50 text-ink' : 'text-muted'}`}
+              >
+                <span style={{ color: '#33B3A6' }}>☾</span> Prayers
+              </button>
+            )}
             <button
               className="btn btn-active border-work bg-work/20"
               onClick={() => setEditor({ defaults: newTaskDefaults() })}
@@ -231,6 +256,8 @@ export function App() {
               <PlannerGrid
                 dates={dates}
                 tasksByDate={tasksByDate}
+                prayerByDate={prayerByDate}
+                showPrayers={showPrayers}
                 onOpen={(id) => setEditor({ task: byId.get(id) })}
               />
             )}
